@@ -41,7 +41,7 @@ This project teaches you to combine human security expertise with AI augmentatio
 
 ### Project Structure
 
-The project is divided into two complementary parts that build on each other:
+The project is divided into complementary parts that build on each other:
 
 #### Part 1: Manual Malware Analysis (40 points)
 You'll analyze the Mirai IoT botnet through hands-on reverse engineering:
@@ -57,6 +57,21 @@ You'll analyze the Mirai IoT botnet through hands-on reverse engineering:
 - **Correlation**: Match source code functions to network traffic signatures
 
 **Deliverable**: Answer 4 graded questions identifying specific exploits and attack types from provided samples.
+
+#### Part 1.5: Binary Analysis with Ghidra (30-60 minutes)
+You'll perform static analysis on Mirai binary executables using the pre-configured Ghidra VM:
+
+- **VM Setup**: Import and configure the provided Ubuntu VM (available in x86_64 and ARM versions)
+- **Binary Import**: Load Mirai executables into Ghidra for reverse engineering
+- **String Analysis**: Extract hardcoded credentials, IPs, C2 domains, and attack payloads from binaries
+- **Function Analysis**: Identify key malware functions (scanning, exploits, DDoS attacks, C2 communication)
+- **Cross-Reference Analysis**: Trace how malware components interact and call each other
+- **Binary-to-Network Correlation**: Document expected network signatures based on binary behavior
+- **IoC Cataloging**: Build a comprehensive list of indicators discovered through binary analysis
+
+**Purpose**: This section bridges source code understanding and network forensics, providing real-world reverse engineering practice and creating the correlation foundation for your AI agent's threat detection capabilities.
+
+**Note**: The VM comes pre-configured with Ghidra installed and the Mirai repository cloned, minimizing setup time.
 
 #### Part 2: AI-Augmented Analysis with CrewAI (60 points)
 You'll build a multi-agent AI system to scale your analysis capabilities:
@@ -77,7 +92,8 @@ The two-part structure ensures you can't shortcut the learning by feeding raw ma
 ### Time Commitment
 
 **Total Estimated Time**: 20-30 hours over 3 weeks
-- Part 1 (Manual Analysis): 10-15 hours
+- Part 1 (Manual Malware Analysis): 9-14 hours
+- Part 1.5 (Binary Analysis with Ghidra): 30-60 minutes
 - Part 2 (AI Agent Development): 10-15 hours
 
 This is a graduate-level project with an expected workload of up to 10 hours per week. The 3-week timeline allows you to develop deep expertise in both manual analysis and AI-augmented workflows.
@@ -85,13 +101,15 @@ This is a graduate-level project with an expected workload of up to 10 hours per
 ### Environment Setup
 
 You'll work with:
-- **Mirai Source Code**: Real botnet code from the 2016 attacks
+- **Pre-configured Ghidra VM**: Ubuntu VM with Ghidra and Mirai repository pre-installed (available in x86_64 and ARM versions for VirtualBox/UTM)
+- **Mirai Source Code**: Real botnet code from the 2016 attacks (pre-cloned in VM)
+- **Mirai Binary Executables**: Compiled malware samples for static analysis
 - **PCAP Files**: Network captures of Mirai infection and DDoS activity
 - **Analysis Tools**: Wireshark, tshark, Ghidra for reverse engineering
 - **CrewAI Framework**: Multi-agent orchestration system
 - **Azure OpenAI**: LLM backend using your student credits ($100/month)
 
-A pre-configured Ghidra analysis VM is provided through the `vmansible` provisioning system (see `vmansible/README.md` for setup instructions).
+**VM Details**: The provided VM comes ready to use with Ghidra 11.2.1, all network analysis tools, and the Mirai repository already cloned. Students who prefer their own analysis environment can clone the Mirai repository and obtain the binaries independently (see `vmansible/README.md` for manual setup instructions).
 
 ### Prerequisites
 
@@ -141,6 +159,7 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 
 #### Malware Artifacts (`/artifacts` - not in this repo)
 - **Mirai Source Code**: Bot, loader, and C2 modules with embedded IoCs
+- **Mirai Binary Executables**: Compiled malware samples for Ghidra static analysis
 - **PCAP Captures**: Network traffic from controlled AWS execution
   - Infection phase: Telnet brute force, HTTP exploits, credential attacks
   - Attack phase: UDP floods, SYN floods, HTTP floods
@@ -156,9 +175,10 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 - **Validation Logic**: Checks YAML syntax, knowledge file formats, agent behavior
 
 #### VM Provisioning (`/vmansible`)
-- **Ghidra Analysis VM**: Ansible-provisioned environment with binary analysis tools
+- **Pre-configured Student VM**: Distributed as OVA file (x86_64 and ARM versions) with everything pre-installed
+- **Ansible Playbook**: For instructors to build the VM or students to set up custom environments
 - **Automated Setup**: One-command deployment of analysis workspace
-- **Tool Suite**: Wireshark, tshark, Ghidra, Python analysis libraries
+- **Tool Suite**: Ghidra 11.2.1, Wireshark, tshark, Python analysis libraries, Mirai source repository
 - **Isolation**: Ensures safe handling of malware artifacts
 
 ### CrewAI Implementation Details
@@ -202,10 +222,11 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 ### Security Considerations
 
 **Malware Handling:**
-- Source code only (no compiled binaries in student repos)
+- Source code and compiled binaries provided in isolated VM only
+- Binaries are for static analysis only—students must never execute them
 - PCAP files are sanitized captures from controlled execution
 - Ghidra VM provides isolated analysis environment
-- Students never execute malware directly
+- VM should be run in NAT/host-only networking mode to prevent network exposure
 
 **Agent Security:**
 - Predetermined architecture prevents injection attacks
@@ -237,10 +258,11 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 
 ### Project Timeline
 
-**Week 1**: Manual analysis (Part 1)
+**Week 1**: Manual and binary analysis (Parts 1 & 1.5)
 - Source code analysis
+- Binary analysis with Ghidra (~30-60 min)
 - PCAP forensics
-- IoC extraction
+- IoC extraction and correlation
 - Detection rule writing
 - Part 1 submission
 
@@ -258,9 +280,10 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 ### Assessment Criteria
 
 **Part 1 (Manual Analysis):**
-- Accuracy of IoC identification
+- Accuracy of IoC identification from source and binaries
 - Quality of detection rules
 - Depth of code-to-traffic correlation
+- Binary analysis findings and correlation documentation
 - Completeness of documentation
 
 **Part 2 (AI System):**
