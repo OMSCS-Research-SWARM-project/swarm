@@ -76,11 +76,11 @@ The two-part structure ensures you can't shortcut the learning by feeding raw ma
 
 ### Time Commitment
 
-**Total Estimated Time**: 12-18 hours
-- Part 1 (Manual Analysis): 6-9 hours
-- Part 2 (AI Agent Development): 6-9 hours
+**Total Estimated Time**: 20-30 hours over 3 weeks
+- Part 1 (Manual Analysis): 10-15 hours
+- Part 2 (AI Agent Development): 10-15 hours
 
-The project spans multiple weeks to allow you to reset monthly Azure student credits between phases.
+This is a graduate-level project with an expected workload of up to 10 hours per week. The 3-week timeline allows you to develop deep expertise in both manual analysis and AI-augmented workflows.
 
 ### Environment Setup
 
@@ -185,7 +185,7 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 **Per-Student Budget:**
 - Azure student credits: $100/month
 - Estimated API usage: $20-40 for complete project
-- Two-phase timeline allows monthly credit reset
+- 3-week timeline fits within single monthly credit allocation
 
 **Grading Cost Control:**
 - Question sampling rather than full test suite
@@ -237,21 +237,23 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 
 ### Project Timeline
 
-**Week 1-2**: Manual analysis (Part 1)
+**Week 1**: Manual analysis (Part 1)
 - Source code analysis
 - PCAP forensics
 - IoC extraction
 - Detection rule writing
+- Part 1 submission
 
-**Week 3**: Part 1 submission and grading
-- Azure credits reset for most students
-
-**Week 4-5**: AI agent development (Part 2)
+**Week 2**: AI agent development (Part 2)
 - CrewAI configuration
 - Knowledge encoding
-- Testing and iteration
+- Prompt engineering
+- Training examples creation
 
-**Week 6**: Part 2 submission and final grading
+**Week 3**: Testing, iteration, and submission
+- System testing and validation
+- Agent refinement
+- Part 2 submission and final grading
 
 ### Assessment Criteria
 
