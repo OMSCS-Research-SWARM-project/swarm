@@ -1,0 +1,142 @@
+# IDE and Editor Files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Testing and Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.cache
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment Variables and Credentials
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets.yaml
+credentials.json
+azure_credentials.yaml
+
+# Azure OpenAI and API Keys
+openai_api_key.txt
+azure_config.yaml
+api_keys/
+
+# Ansible
+*.retry
+.vault_pass
+vault_password.txt
+*.vault
+
+# Autograder Generated Files
+autograder/results/
+autograder/submission/
+results.json
+autograder.zip
+
+# CrewAI and Agent Outputs
+crewai_cache/
+agent_outputs/
+crew_logs/
+.crew/
+
+# VM and Large Binary Files
+*.ova
+*.vmdk
+*.vdi
+*.qcow2
+*.iso
+
+# PCAP Files (if large samples stored locally)
+*.pcap
+*.pcapng
+# Uncomment if you want to track small sample PCAPs:
+# !samples/*.pcap
+
+# Malware Artifacts (if stored locally)
+artifacts/
+malware_samples/
+*.bin
+*.exe
+*.dll
+
+# Log Files
+*.log
+logs/
+*.out
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+.temp/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+.directory
+.Trash-*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Project-specific
+GhidraProjects/
+student_submissions/
+grading_outputs/
+test_results/

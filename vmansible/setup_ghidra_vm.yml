@@ -1,0 +1,285 @@
+---
+- name: Configure Ubuntu 24.04 VM for Ghidra Malware Analysis
+  hosts: ghidra_vm
+  become: yes
+  vars:
+    ghidra_version: "11.2.1"
+    ghidra_release_date: "20241105"
+    ghidra_download_url: "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_{{ ghidra_version }}_build/ghidra_{{ ghidra_version }}_PUBLIC_{{ ghidra_release_date }}.zip"
+    aanma_home: "/home/aanma"
+
+  tasks:
+    - name: Gather system facts
+      setup:
+
+    - name: Display detected architecture
+      debug:
+        msg: "Detected architecture: {{ ansible_architecture }}"
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install essential utilities
+      apt:
+        name:
+          - net-tools
+          - vim
+          - htop
+          - curl
+          - wget
+          - git
+          - tree
+          - unzip
+          - tmux
+          - build-essential
+          - python3-pip
+        state: present
+
+    - name: Install Xfce desktop environment (x86_64)
+      apt:
+        name:
+          - xfce4
+          - xfce4-goodies
+          - xorg
+          - lightdm
+        state: present
+      when: ansible_architecture == "x86_64"
+
+    - name: Install LXDE desktop environment (ARM)
+      apt:
+        name:
+          - lxde
+          - xorg
+          - lightdm
+        state: present
+      when: ansible_architecture == "aarch64"
+
+    - name: Set LightDM as default display manager
+      debconf:
+        name: lightdm
+        question: shared/default-x-display-manager
+        value: lightdm
+        vtype: select
+
+    - name: Enable LightDM service
+      systemd:
+        name: lightdm
+        enabled: yes
+        state: started
+
+    - name: Configure LightDM for autologin
+      copy:
+        dest: /etc/lightdm/lightdm.conf.d/50-autologin.conf
+        content: |
+          [Seat:*]
+          autologin-user=aanma
+          autologin-user-timeout=0
+        mode: '0644'
+      notify: Restart LightDM
+
+    - name: Create Ghidra download directory
+      file:
+        path: /tmp/ghidra_download
+        state: directory
+        mode: '0755'
+
+    - name: Download Ghidra
+      get_url:
+        url: "{{ ghidra_download_url }}"
+        dest: "/tmp/ghidra_download/ghidra.zip"
+        timeout: 300
+      register: ghidra_download
+      retries: 3
+      delay: 10
+      until: ghidra_download is succeeded
+
+    - name: Extract Ghidra to /opt
+      unarchive:
+        src: "/tmp/ghidra_download/ghidra.zip"
+        dest: /opt
+        remote_src: yes
+        creates: "/opt/ghidra_{{ ghidra_version }}_PUBLIC"
+
+    - name: Create Ghidra symlink
+      file:
+        src: "/opt/ghidra_{{ ghidra_version }}_PUBLIC"
+        dest: /opt/ghidra
+        state: link
+
+    - name: Ensure Desktop directory exists for aanma
+      file:
+        path: "{{ aanma_home }}/Desktop"
+        state: directory
+        owner: aanma
+        group: aanma
+        mode: '0755'
+
+    - name: Create Ghidra desktop entry
+      copy:
+        dest: "{{ aanma_home }}/Desktop/ghidra.desktop"
+        content: |
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Ghidra
+          Comment=Software Reverse Engineering Tool
+          Exec=/opt/ghidra/ghidraRun
+          Icon=/opt/ghidra/support/ghidra.png
+          Terminal=true
+          Categories=Development;ReverseEngineering;
+        mode: '0755'
+        owner: aanma
+        group: aanma
+
+    - name: Ensure Xfce desktop config directory exists
+      file:
+        path: "{{ aanma_home }}/.config/xfce4/desktop"
+        state: directory
+        owner: aanma
+        group: aanma
+        mode: '0755'
+      when: ansible_architecture == "x86_64"
+
+    - name: Mark Ghidra desktop file as trusted (Xfce)
+      file:
+        path: "{{ aanma_home }}/.config/xfce4/desktop/trusted-{{ ansible_date_time.epoch }}.list"
+        state: touch
+        owner: aanma
+        group: aanma
+      when: ansible_architecture == "x86_64"
+
+    - name: Create Projects directory
+      file:
+        path: "{{ aanma_home }}/GhidraProjects"
+        state: directory
+        owner: aanma
+        group: aanma
+        mode: '0755'
+
+    - name: Clone Mirai source code repository
+      git:
+        repo: 'https://github.com/jgamblin/Mirai-Source-Code.git'
+        dest: "{{ aanma_home }}/Mirai-Source-Code"
+        version: master
+      become_user: aanma
+
+    - name: Create analysis workspace directory
+      file:
+        path: "{{ aanma_home }}/malware-analysis"
+        state: directory
+        owner: aanma
+        group: aanma
+        mode: '0755'
+
+    - name: Create README in workspace
+      copy:
+        dest: "{{ aanma_home }}/malware-analysis/README.txt"
+        content: |
+          Malware Analysis Workspace
+          ==========================
+          
+          This directory is your workspace for malware analysis.
+          
+          Important directories:
+          - ~/Mirai-Source-Code: The Mirai botnet source code
+          - ~/GhidraProjects: Store your Ghidra project files here
+          - ~/malware-analysis: Working directory for analysis notes
+          
+          Credentials:
+          - Username: aanma
+          - Password: aanma
+          
+          ⚠️ SAFETY WARNING:
+          This VM contains real malware samples. Do NOT:
+          - Run the malware binaries
+          - Connect this VM to production networks
+          - Copy malware outside of isolated environments
+          
+          Tools installed:
+          - Ghidra (reverse engineering)
+          - vim, htop, tmux (utilities)
+          
+          To launch Ghidra:
+          - Double-click the Ghidra icon on your Desktop, OR
+          - Run: /opt/ghidra/ghidraRun
+          
+          Happy analyzing!
+        owner: aanma
+        group: aanma
+        mode: '0644'
+
+    - name: Configure vim for better usability
+      copy:
+        dest: "{{ aanma_home }}/.vimrc"
+        content: |
+          set number
+          set expandtab
+          set tabstop=4
+          set shiftwidth=4
+          syntax on
+          set autoindent
+          set hlsearch
+        owner: aanma
+        group: aanma
+        mode: '0644'
+
+    - name: Add helpful aliases to bashrc
+      blockinfile:
+        path: "{{ aanma_home }}/.bashrc"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Analysis VM aliases"
+        block: |
+          alias ghidra='/opt/ghidra/ghidraRun'
+          alias ll='ls -lah'
+          alias mirai='cd ~/Mirai-Source-Code'
+          alias workspace='cd ~/malware-analysis'
+        owner: aanma
+        group: aanma
+
+    - name: Set proper ownership of home directory
+      file:
+        path: "{{ aanma_home }}"
+        owner: aanma
+        group: aanma
+        recurse: yes
+
+    - name: Clean up download directory
+      file:
+        path: /tmp/ghidra_download
+        state: absent
+
+    - name: Display completion message
+      debug:
+        msg:
+          - "==================================================="
+          - "Ghidra VM Setup Complete!"
+          - "==================================================="
+          - "Architecture: {{ ansible_architecture }}"
+          - "Desktop Environment: {% if ansible_architecture == 'x86_64' %}Xfce{% else %}LXDE{% endif %}"
+          - ""
+          - "VM Credentials:"
+          - "  Username: aanma"
+          - "  Password: aanma"
+          - ""
+          - "Installed Tools:"
+          - "  - Ghidra {{ ghidra_version }} (/opt/ghidra)"
+          - "  - Essential utilities (vim, htop, tmux, etc.)"
+          - ""
+          - "Quick Start:"
+          - "  - VM will auto-login as aanma on restart"
+          - "  - Launch Ghidra: Desktop icon or 'ghidra' command"
+          - "  - Mirai source: ~/Mirai-Source-Code"
+          - "  - Workspace: ~/malware-analysis"
+          - ""
+          - "⚠️ Remember: This VM contains real malware samples!"
+          - "   Keep it isolated from production networks."
+          - "==================================================="
+          - ""
+          - "IMPORTANT: Restart the VM for desktop environment to load"
+
+  handlers:
+    - name: Restart LightDM
+      systemd:
+        name: lightdm
+        state: restarted
