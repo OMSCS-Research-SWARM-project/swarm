@@ -73,6 +73,9 @@
           - gnupg
           - software-properties-common
           - lsb-release
+          - htop
+          - net-tools
+          - tmux
         state: present
 
     # ===== USER SETUP =====
@@ -164,6 +167,34 @@
     - name: Enable QEMU guest agent
       systemd:
         name: qemu-guest-agent
+        enabled: yes
+        state: started
+      ignore_errors: yes
+
+    # ===== NETWORKING =====
+
+    - name: Copy network interface configuration script
+      copy:
+        src: "{{ playbook_dir }}/../networking/configure-network-interface.sh"
+        dest: /usr/local/bin/configure-network-interface.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure /etc/rc.local exists and calls network config script
+      copy:
+        dest: /etc/rc.local
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          /usr/local/bin/configure-network-interface.sh
+          exit 0
+
+    - name: Enable rc-local service
+      systemd:
+        name: rc-local
         enabled: yes
         state: started
       ignore_errors: yes
@@ -268,13 +299,6 @@
         group: swarm
         mode: '0755'
 
-    - name: Create PCAP analysis directory
-      file:
-        path: "{{ swarm_home }}/pcaps"
-        state: directory
-        owner: swarm
-        group: swarm
-        mode: '0755'
 
     - name: Create malware-analysis workspace
       file:
@@ -289,14 +313,6 @@
         repo: 'https://github.com/jgamblin/Mirai-Source-Code.git'
         dest: "{{ swarm_home }}/Mirai-Source-Code"
         version: master
-      become_user: swarm
-
-    - name: Clone theZoo Linux.Mirai.B binary samples
-      git:
-        repo: 'https://github.com/ytisf/theZoo.git'
-        dest: "{{ swarm_home }}/theZoo"
-        version: master
-        depth: 1
       become_user: swarm
 
     - name: Clone SWARM project files repository
@@ -326,6 +342,18 @@
         group: swarm
         mode: '0755'
 
+    - name: Sparse-checkout Linux.Mirai.B into malware-sample
+      shell: |
+        tmpdir=$(mktemp -d)
+        git clone --filter=blob:none --sparse --depth=1 \
+          https://github.com/ytisf/theZoo.git "$tmpdir"
+        git -C "$tmpdir" sparse-checkout set malware/Binaries/Linux.Mirai.B
+        mv "$tmpdir/malware/Binaries/Linux.Mirai.B" "{{ swarm_home }}/malware-sample/Linux.Mirai.B"
+        rm -rf "$tmpdir"
+      args:
+        creates: "{{ swarm_home }}/malware-sample/Linux.Mirai.B"
+      become_user: swarm
+
     - name: Copy malware sample zip to VM
       copy:
         src: "/home/vttrain/malware-sample/sample.zip"
@@ -335,21 +363,11 @@
         mode: '0644'
 
     - name: Unzip malware sample on VM
-      unarchive:
-        src: "{{ swarm_home }}/malware-sample/sample.zip"
-        dest: "{{ swarm_home }}/malware-sample"
-        remote_src: yes
-        owner: swarm
-        group: swarm
-
-    - name: Symlink Linux.Mirai.B into home directory
-      file:
-        src: "{{ swarm_home }}/theZoo/malware/Binaries/Linux.Mirai.B"
-        dest: "{{ swarm_home }}/Linux.Mirai.B"
-        state: link
-        owner: swarm
-        group: swarm
+      shell: unzip -P infected -o "{{ swarm_home }}/malware-sample/sample.zip" -d "{{ swarm_home }}/malware-sample"
+      args:
+        creates: "{{ swarm_home }}/malware-sample/sample"
       become_user: swarm
+
 
     - name: Write workspace README
       copy:
@@ -362,12 +380,9 @@
 
           Directories:
             ~/Mirai-Source-Code   - Mirai botnet source code
-            ~/Linux.Mirai.B        - Mirai packed binaries (theZoo samples, symlink)
-            ~/theZoo               - Full theZoo malware repo (shallow clone)
             ~/swarm-files          - SWARM project shared files and resources
             ~/GhidraProjects       - Ghidra project files
             ~/malware-analysis     - Analysis notes and reports
-            ~/pcaps                - PCAP captures for analysis
 
           Credentials:
             Username: swarm  |  Password: 6262student
@@ -430,9 +445,7 @@
         block: |
           alias ll='ls -lah'
           alias mirai='cd ~/Mirai-Source-Code'
-          alias miraibin='cd ~/Linux.Mirai.B'
           alias workspace='cd ~/malware-analysis'
-          alias pcap='cd ~/pcaps'
           alias r2='radare2'
           alias strings='strings -a'
         owner: swarm
