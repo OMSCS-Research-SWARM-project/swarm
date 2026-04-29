@@ -299,7 +299,6 @@
         group: swarm
         mode: '0755'
 
-
     - name: Create malware-analysis workspace
       file:
         path: "{{ swarm_home }}/malware-analysis"
@@ -367,7 +366,6 @@
       args:
         creates: "{{ swarm_home }}/malware-sample/sample"
       become_user: swarm
-
 
     - name: Write workspace README
       copy:
