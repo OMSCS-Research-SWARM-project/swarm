@@ -1,1 +1,1 @@
-## AANMA Autograder
+## SWARM Autograder

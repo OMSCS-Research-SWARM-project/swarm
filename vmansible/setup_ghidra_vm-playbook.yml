@@ -1,0 +1,501 @@
+---
+- name: Configure Ubuntu 24.04 Malware Analysis VM (Ghidra + static RE)
+  hosts: ghidra_vm
+  become: yes
+  vars:
+    ghidra_version: "11.2.1"
+    ghidra_release_date: "20241105"
+    ghidra_download_url: "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_{{ ghidra_version }}_build/ghidra_{{ ghidra_version }}_PUBLIC_{{ ghidra_release_date }}.zip"
+    swarm_home: "/home/swarm"
+    analysis_venv: "/opt/analysis-tools"
+    is_x86_64: "{{ ansible_architecture == 'x86_64' }}"
+    is_arm64: "{{ ansible_architecture == 'aarch64' }}"
+
+  tasks:
+
+    # ===== SYSTEM DETECTION =====
+
+    - name: Gather system facts
+      setup:
+
+    - name: Display detected environment
+      debug:
+        msg:
+          - "Architecture  : {{ ansible_architecture }}"
+          - "Platform      : {{ 'x86_64 (Intel/AMD)' if is_x86_64 else 'ARM64/aarch64 (Apple Silicon / UTM)' }}"
+          - "Hypervisor    : {{ ansible_virtualization_type | default('unknown') }}"
+          - "OS            : {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+    # ===== BASE SYSTEM =====
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install essential base packages
+      apt:
+        name:
+          - net-tools
+          - vim
+          - htop
+          - curl
+          - wget
+          - git
+          - tree
+          - unzip
+          - tmux
+          - build-essential
+          - python3-pip
+          - python3-venv
+          - python3-dev
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - software-properties-common
+          - lsb-release
+          - dkms
+          - linux-headers-generic
+        state: present
+
+    # ===== USER SETUP =====
+
+    - name: Ensure swarm user is in required groups
+      user:
+        name: swarm
+        groups: sudo,audio,video,plugdev,netdev,adm,wireshark
+        append: yes
+
+    - name: Allow Wireshark capture without sudo
+      debconf:
+        name: wireshark-common
+        question: wireshark-common/install-setuid
+        value: "true"
+        vtype: boolean
+
+    # ===== KDE PLASMA DESKTOP =====
+
+    - name: Remove LightDM if present
+      apt:
+        name: lightdm
+        state: absent
+        purge: yes
+      ignore_errors: yes
+
+    - name: Install KDE Plasma desktop
+      apt:
+        name:
+          - kde-plasma-desktop
+          - sddm
+          - konsole
+          - dolphin
+          - kate
+          - plasma-nm
+          - xorg
+        state: present
+
+    - name: Set SDDM as default display manager
+      debconf:
+        name: sddm
+        question: shared/default-x-display-manager
+        value: sddm
+        vtype: select
+
+    - name: Enable SDDM service
+      systemd:
+        name: sddm
+        enabled: yes
+        state: started
+      ignore_errors: yes
+
+    - name: Ensure SDDM config directory exists
+      file:
+        path: /etc/sddm.conf.d
+        state: directory
+        mode: '0755'
+
+    - name: Configure SDDM autologin for swarm
+      copy:
+        dest: /etc/sddm.conf.d/autologin.conf
+        content: |
+          [Autologin]
+          User=swarm
+          Session=plasma
+        mode: '0644'
+      notify: Restart SDDM
+
+    # ===== ACCESSIBILITY =====
+
+    - name: Install accessibility tools
+      apt:
+        name:
+          - orca
+          - speech-dispatcher
+          - espeak-ng
+        state: present
+      ignore_errors: yes
+
+    # ===== VM GUEST TOOLS =====
+
+    - name: Install open-vm-tools (VMware / Fusion)
+      apt:
+        name:
+          - open-vm-tools
+          - open-vm-tools-desktop
+        state: present
+
+    - name: Install QEMU/SPICE guest tools (ARM/UTM)
+      apt:
+        name:
+          - spice-vdagent
+          - qemu-guest-agent
+          - spice-webdavd
+        state: present
+      when: is_arm64
+      ignore_errors: yes
+
+    - name: Enable QEMU guest agent (ARM)
+      systemd:
+        name: qemu-guest-agent
+        enabled: yes
+        state: started
+      when: is_arm64
+      ignore_errors: yes
+
+    - name: Check if VirtualBox guest packages are available
+      shell: apt-cache search virtualbox-guest | grep -q virtualbox-guest-utils
+      register: vbox_packages_available
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Install VirtualBox guest additions from repos (x86_64 only)
+      apt:
+        name:
+          - virtualbox-guest-utils
+          - virtualbox-guest-x11
+        state: present
+      when:
+        - is_x86_64
+        - vbox_packages_available.rc == 0
+      ignore_errors: yes
+
+    - name: Create VirtualBox manual-install note if packages not available
+      copy:
+        dest: "{{ swarm_home }}/Desktop/INSTALL_VBOX_GUEST_ADDITIONS.txt"
+        content: |
+          VirtualBox Guest Additions Installation
+          ========================================
+          If running in VirtualBox: Devices > Insert Guest Additions CD image, then:
+            cd /media/swarm/VBox_GAs_*
+            sudo ./VBoxLinuxAdditions.run
+          Reboot after installation.
+        owner: swarm
+        group: swarm
+        mode: '0644'
+      when: vbox_packages_available.rc != 0
+      ignore_errors: yes
+
+    # ===== PCAP / NETWORK FORENSICS =====
+
+    - name: Install PCAP and network forensics tools
+      apt:
+        name:
+          - wireshark
+          - tshark
+          - tcpdump
+          - nmap
+          - dnsutils
+          - whois
+        state: present
+
+    # ===== BINARY / STATIC ANALYSIS =====
+
+    - name: Install binary and static analysis tools
+      apt:
+        name:
+          - binutils               # strings, objdump, readelf, nm
+          - file                   # file type identification
+          - xxd                    # hex dump
+          - radare2                # RE framework
+          - binwalk                # binary format detection
+          - upx-ucl                # Mirai binaries are commonly UPX-packed
+          - yara                   # malware pattern matching
+          - libimage-exiftool-perl # binary metadata extraction
+        state: present
+
+    # ===== JAVA (Ghidra dependency) =====
+
+    - name: Install OpenJDK 21
+      apt:
+        name: openjdk-21-jdk
+        state: present
+
+    # ===== PYTHON ANALYSIS ENVIRONMENT =====
+    # Dedicated venv avoids Ubuntu 24.04's externally-managed Python restriction
+    # and keeps analysis tools globally accessible via PATH.
+
+    - name: Create Python venv for analysis tools
+      command: python3 -m venv {{ analysis_venv }}
+      args:
+        creates: "{{ analysis_venv }}/bin/python"
+
+    - name: Upgrade pip inside analysis venv
+      pip:
+        name: pip
+        state: latest
+        virtualenv: "{{ analysis_venv }}"
+
+    - name: Install Python malware analysis packages
+      pip:
+        name:
+          - pefile        # PE file parsing
+          - yara-python   # Python YARA bindings
+          - capstone      # disassembly library
+          - scapy         # PCAP parsing and packet dissection
+        virtualenv: "{{ analysis_venv }}"
+
+    - name: Add analysis venv to swarm PATH
+      blockinfile:
+        path: "{{ swarm_home }}/.bashrc"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Analysis venv PATH"
+        block: |
+          export PATH="{{ analysis_venv }}/bin:$PATH"
+          export VIRTUAL_ENV="{{ analysis_venv }}"
+        owner: swarm
+        group: swarm
+
+    # ===== GHIDRA =====
+
+    - name: Create Ghidra download directory
+      file:
+        path: /tmp/ghidra_download
+        state: directory
+        mode: '0755'
+
+    - name: Download Ghidra {{ ghidra_version }}
+      get_url:
+        url: "{{ ghidra_download_url }}"
+        dest: "/tmp/ghidra_download/ghidra.zip"
+        timeout: 300
+      register: ghidra_download
+      retries: 3
+      delay: 10
+      until: ghidra_download is succeeded
+
+    - name: Extract Ghidra to /opt
+      unarchive:
+        src: "/tmp/ghidra_download/ghidra.zip"
+        dest: /opt
+        remote_src: yes
+        creates: "/opt/ghidra_{{ ghidra_version }}_PUBLIC"
+
+    - name: Create /opt/ghidra symlink
+      file:
+        src: "/opt/ghidra_{{ ghidra_version }}_PUBLIC"
+        dest: /opt/ghidra
+        state: link
+
+    - name: Clean up Ghidra download directory
+      file:
+        path: /tmp/ghidra_download
+        state: absent
+
+    # ===== DESKTOP ENTRIES =====
+
+    - name: Ensure Desktop directory exists
+      file:
+        path: "{{ swarm_home }}/Desktop"
+        state: directory
+        owner: swarm
+        group: swarm
+        mode: '0755'
+
+    - name: Create Ghidra desktop entry
+      copy:
+        dest: "{{ swarm_home }}/Desktop/ghidra.desktop"
+        content: |
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Ghidra
+          Comment=Software Reverse Engineering Tool
+          Exec=/opt/ghidra/ghidraRun
+          Icon=/opt/ghidra/support/ghidra.png
+          Terminal=true
+          Categories=Development;ReverseEngineering;
+        mode: '0755'
+        owner: swarm
+        group: swarm
+
+    - name: Create Wireshark desktop entry
+      copy:
+        dest: "{{ swarm_home }}/Desktop/wireshark.desktop"
+        content: |
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Wireshark
+          Comment=Network Protocol Analyzer
+          Exec=wireshark
+          Icon=wireshark
+          Terminal=false
+          Categories=Network;Security;
+        mode: '0755'
+        owner: swarm
+        group: swarm
+
+    # ===== ANALYSIS WORKSPACE =====
+
+    - name: Create GhidraProjects directory
+      file:
+        path: "{{ swarm_home }}/GhidraProjects"
+        state: directory
+        owner: swarm
+        group: swarm
+        mode: '0755'
+
+    - name: Create PCAP analysis directory
+      file:
+        path: "{{ swarm_home }}/pcaps"
+        state: directory
+        owner: swarm
+        group: swarm
+        mode: '0755'
+
+    - name: Create malware-analysis workspace
+      file:
+        path: "{{ swarm_home }}/malware-analysis"
+        state: directory
+        owner: swarm
+        group: swarm
+        mode: '0755'
+
+    - name: Clone Mirai source code repository
+      git:
+        repo: 'https://github.com/jgamblin/Mirai-Source-Code.git'
+        dest: "{{ swarm_home }}/Mirai-Source-Code"
+        version: master
+      become_user: swarm
+
+    - name: Write workspace README
+      copy:
+        dest: "{{ swarm_home }}/malware-analysis/README.txt"
+        content: |
+          Malware Analysis Workspace
+          ==========================
+          Architecture: {{ ansible_architecture }}
+
+          Directories:
+            ~/Mirai-Source-Code   - Mirai botnet source
+            ~/GhidraProjects       - Ghidra project files
+            ~/malware-analysis     - Analysis notes and reports
+            ~/pcaps                - PCAP captures for analysis
+
+          Credentials:
+            Username: swarm  |  Password: swarm
+
+          WARNING: This VM contains malware samples for STATIC ANALYSIS ONLY.
+            - Do NOT execute any malware binaries
+            - Keep VM on host-only / NAT networking
+            - Do NOT copy malware outside isolated environments
+
+          Installed Tools:
+            Reverse Engineering : Ghidra {{ ghidra_version }}, radare2, binwalk
+            Binary Utilities    : strings, objdump, readelf (binutils), file, xxd, exiftool
+            Packed Binaries     : upx  (Mirai is often UPX-packed — run: upx -d <binary>)
+            PCAP Forensics      : Wireshark, tshark, tcpdump
+            Network / IoC       : nmap, dig (dnsutils), whois
+            Pattern Matching    : yara
+            Python (in venv)    : pefile, yara-python, capstone, scapy
+
+          Quick Commands:
+            ghidra            - Launch Ghidra
+            r2 <file>         - radare2 binary analysis
+            binwalk <file>    - Identify binary formats / sections
+            strings <file>    - Extract printable strings (-a flag set by default)
+            upx -d <file>     - Decompress UPX-packed binary before loading into Ghidra
+            tshark -r <pcap>  - CLI PCAP inspection
+            yara <rules> <file> - Scan binary against YARA rules
+        owner: swarm
+        group: swarm
+        mode: '0644'
+
+    # ===== SHELL CONFIGURATION =====
+
+    - name: Configure vim
+      copy:
+        dest: "{{ swarm_home }}/.vimrc"
+        content: |
+          set number
+          set expandtab
+          set tabstop=4
+          set shiftwidth=4
+          syntax on
+          set autoindent
+          set hlsearch
+        owner: swarm
+        group: swarm
+        mode: '0644'
+
+    - name: Add analysis aliases to .bashrc
+      blockinfile:
+        path: "{{ swarm_home }}/.bashrc"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Analysis aliases"
+        block: |
+          alias ghidra='/opt/ghidra/ghidraRun'
+          alias ll='ls -lah'
+          alias mirai='cd ~/Mirai-Source-Code'
+          alias workspace='cd ~/malware-analysis'
+          alias pcap='cd ~/pcaps'
+          alias r2='radare2'
+          alias strings='strings -a'
+        owner: swarm
+        group: swarm
+
+    # ===== PERMISSIONS =====
+
+    - name: Set ownership of swarm home directory
+      file:
+        path: "{{ swarm_home }}"
+        owner: swarm
+        group: swarm
+        recurse: yes
+
+    - name: Remove stale .Xauthority file
+      file:
+        path: "{{ swarm_home }}/.Xauthority"
+        state: absent
+
+    # ===== SUMMARY =====
+
+    - name: Display completion summary
+      debug:
+        msg:
+          - "======================================================="
+          - " Malware Analysis VM — Setup Complete"
+          - "======================================================="
+          - " Architecture : {{ ansible_architecture }}"
+          - " Platform     : {{ 'x86_64 (Intel/AMD)' if is_x86_64 else 'ARM64 (Apple Silicon / UTM)' }}"
+          - ""
+          - " Installed Tools:"
+          - "   RE / Static : Ghidra {{ ghidra_version }}, radare2, binwalk, upx"
+          - "   Bin utils   : strings, objdump, readelf, file, xxd, exiftool"
+          - "   PCAP        : Wireshark, tshark, tcpdump"
+          - "   Network/IoC : nmap, dig, whois"
+          - "   Patterns    : yara"
+          - "   Python venv : pefile, yara-python, capstone, scapy"
+          - ""
+          - " VM Credentials : swarm / swarm"
+          - " Desktop        : KDE Plasma (SDDM autologin)"
+          - " Analysis venv  : {{ analysis_venv }} (on PATH via .bashrc)"
+          - ""
+          - " IMPORTANT: Static analysis only — do NOT execute malware binaries."
+          - " Restart the VM for desktop changes to take effect."
+          - "======================================================="
+
+  handlers:
+    - name: Restart SDDM
+      systemd:
+        name: sddm
+        state: restarted
+      ignore_errors: yes

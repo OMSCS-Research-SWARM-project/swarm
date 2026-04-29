@@ -9,7 +9,7 @@ This directory contains Ansible configuration to automatically set up an Ubuntu 
    - **ARM (Apple Silicon):** Ubuntu 24.04 Server ARM64 for M1/M2/M3/M4 Macs
 2. **Ansible** installed on your control machine (the machine you'll run Ansible from)
 3. **SSH access** to the VM
-4. **User aanma** created on the VM with password `aanma` and sudo privileges
+4. **User swarm** created on the VM with password `swarm` and sudo privileges
 
 **Note on Architecture:** The playbook automatically detects your VM's architecture and installs the appropriate desktop environment:
 - x86_64: Xfce (lightweight, full-featured)
@@ -17,7 +17,7 @@ This directory contains Ansible configuration to automatically set up an Ubuntu 
 
 ## Quick Start
 
-### 1. Set up the aanma user on the fresh VM
+### 1. Set up the swarm user on the fresh VM
 
 **For x86_64 (VirtualBox on Intel/AMD):**
 
@@ -30,9 +30,9 @@ Download Ubuntu 24.04 Server ARM64 from: https://cdimage.ubuntu.com/releases/24.
 Then, SSH into your fresh Ubuntu 24.04 VM and run:
 
 ```bash
-# Create aanma user with sudo privileges
-sudo useradd -m -s /bin/bash -G sudo aanma
-echo "aanma:aanma" | sudo chpasswd
+# Create swarm user with sudo privileges
+sudo useradd -m -s /bin/bash -G sudo swarm
+echo "swarm:swarm" | sudo chpasswd
 
 # Install openssh-server if not already installed
 sudo apt update
@@ -90,7 +90,7 @@ The playbook will:
 ### Desktop Environment
 - **x86_64 (Intel/AMD):** Xfce desktop with LightDM
 - **ARM (Apple Silicon):** LXDE desktop with LightDM
-- Auto-login configured for aanma user
+- Auto-login configured for swarm user
 
 ### Utilities
 - net-tools, vim, htop, tmux
@@ -113,8 +113,8 @@ The playbook will:
 ## Student VM Details
 
 **Login Credentials:**
-- Username: `aanma`
-- Password: `aanma`
+- Username: `swarm`
+- Password: `swarm`
 
 **Important Directories:**
 - `/opt/ghidra` - Ghidra installation
@@ -134,7 +134,7 @@ The playbook will:
 If Ansible can't connect:
 ```bash
 # Test SSH connection
-ssh aanma@<VM_IP>
+ssh swarm@<VM_IP>
 
 # If SSH keys cause issues, use password auth
 ansible-playbook -i inventory.ini setup_ghidra_vm.yml -k -K

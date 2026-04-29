@@ -92,13 +92,13 @@ When creating the OVA/export:
 1. Shutdown the VM cleanly
 2. VirtualBox → File → Export Appliance
 3. Choose OVA 2.0 format
-4. Filename: `aanma-ghidra-vm-x86_64.ova`
+4. Filename: `swarm-ghidra-vm-x86_64.ova`
 
 **For ARM:**
 1. Shutdown the VM cleanly
 2. UTM → Right-click VM → Share
-3. Export as: `aanma-ghidra-vm-arm64.utm`
-4. Or compress the VM bundle: `aanma-ghidra-vm-arm64.zip`
+3. Export as: `swarm-ghidra-vm-arm64.utm`
+4. Or compress the VM bundle: `swarm-ghidra-vm-arm64.zip`
 
 **Provide both versions to students:**
 - Intel/AMD Mac users: Use x86_64 OVA with VirtualBox
@@ -108,17 +108,17 @@ When creating the OVA/export:
 
 ### Intel/AMD Mac or PC (x86_64)
 1. Install VirtualBox from virtualbox.org
-2. Double-click the `aanma-ghidra-vm-x86_64.ova` file
+2. Double-click the `swarm-ghidra-vm-x86_64.ova` file
 3. Import with default settings
 4. Start the VM
-5. Auto-login as aanma (password: aanma if prompted)
+5. Auto-login as swarm (password: swarm if prompted)
 
 ### Apple Silicon Mac (M1/M2/M3/M4)
 1. Install UTM from getutm.app (free)
 2. Open UTM
-3. Import the `aanma-ghidra-vm-arm64.utm` or extract the ZIP
+3. Import the `swarm-ghidra-vm-arm64.utm` or extract the ZIP
 4. Start the VM
-5. Auto-login as aanma (password: aanma if prompted)
+5. Auto-login as swarm (password: swarm if prompted)
 
 ## Ansible Playbook Logic
 

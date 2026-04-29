@@ -1,16 +1,16 @@
-# AI-Augmented Network Malware Analysis (AANMA)
+# AI-Augmented Network Malware Analysis (SWARM)
 
 A comprehensive graduate-level cybersecurity project combining traditional malware analysis techniques with modern AI-augmented security workflows. Students analyze the Mirai botnet through manual reverse engineering and network forensics, then build a multi-agent AI system using CrewAI to scale their analysis capabilities.
 
 ## Repository Structure
 
 ```
-aanma-project/  
+swarm-project/  
 ├── README.md  
 ├── autograder/  
 │   ├── setup.sh  
 │   ├── run_autograder  
-│   ├── aanma_autograder.py  
+│   ├── swarm_autograder.py  
 │   └── tests/  
         # sample test cases  
 │       ├── test_ioc_extraction.py  
@@ -53,10 +53,9 @@ You'll analyze the Mirai IoT botnet through hands-on reverse engineering:
 - **PCAP Forensics**: Analyze real Mirai network captures showing infection and attack phases
 - **Manual Packet Dissection**: Read raw packet data (ASCII/hex) to build fundamental forensics skills
 - **IoC Documentation**: Create structured catalogs of malicious indicators
-- **Detection Rules**: Write Snort/Suricata signatures for Mirai network patterns
 - **Correlation**: Match source code functions to network traffic signatures
 
-**Deliverable**: Answer 4 graded questions identifying specific exploits and attack types from provided samples.
+**Deliverable**: Answer 4 quiz questions identifying specific exploits and attack types from provided samples.
 
 #### Part 1.5: Binary Analysis with Ghidra (30-60 minutes)
 You'll perform static analysis on Mirai binary executables using the pre-configured Ghidra VM:
@@ -69,7 +68,7 @@ You'll perform static analysis on Mirai binary executables using the pre-configu
 - **Binary-to-Network Correlation**: Document expected network signatures based on binary behavior
 - **IoC Cataloging**: Build a comprehensive list of indicators discovered through binary analysis
 
-**Purpose**: This section bridges source code understanding and network forensics, providing real-world reverse engineering practice and creating the correlation foundation for your AI agent's threat detection capabilities.
+**Purpose**: This section bridges source code understanding and network forensics, providing real-world reverse engineering practice and creating the foundation for your AI agent's threat detection capabilities.
 
 **Note**: The VM comes pre-configured with Ghidra installed and the Mirai repository cloned, minimizing setup time.
 
@@ -169,7 +168,7 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 - **Gradescope Integration**: Standard Gradescope autograder structure
   - `setup.sh`: Installs dependencies and configures grading environment
   - `run_autograder`: Entry point script called by Gradescope
-  - `aanma_autograder.py`: Main grading logic for both project parts
+  - `swarm_autograder.py`: Main grading logic for both project parts
 - **Test Suite** (`/tests`): Validates student IoC extraction, detection rules, and agent outputs
 - **Sampling Strategy**: Cost-controlled grading that selects representative questions
 - **Validation Logic**: Checks YAML syntax, knowledge file formats, agent behavior
@@ -251,7 +250,7 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 
 **Autograder Maintenance:**
 1. Review student submissions for edge cases
-2. Update validation logic in `aanma_autograder.py` for common issues
+2. Update validation logic in `swarm_autograder.py` for common issues
 3. Refine test cases based on learning objectives
 4. Monitor API costs and adjust sampling in grading logic
 5. Deploy updates to Gradescope: `zip -r autograder.zip autograder/`
@@ -329,7 +328,7 @@ When extending this project:
 ```bash
 # Clone repository
 git clone <repo-url>
-cd aanma-project
+cd swarm-project
 
 # Provision Ghidra analysis VM
 cd vmansible
