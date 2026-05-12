@@ -1,11 +1,8 @@
 ---
-- name: Configure Ubuntu 24.04 Malware Analysis VM (Ghidra + static RE)
+- name: Configure Ubuntu 24.04 Malware Analysis VM (REMnux-equivalent + Ghidra)
   hosts: ghidra_vm
   become: yes
   vars:
-    ghidra_version: "11.2.1"
-    ghidra_release_date: "20241105"
-    ghidra_download_url: "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_{{ ghidra_version }}_build/ghidra_{{ ghidra_version }}_PUBLIC_{{ ghidra_release_date }}.zip"
     swarm_home: "/home/swarm"
     analysis_venv: "/opt/analysis-tools"
     is_x86_64: "{{ ansible_architecture == 'x86_64' }}"
@@ -173,81 +170,6 @@
       when: is_arm64
       ignore_errors: yes
 
-    # ===== PCAP / NETWORK FORENSICS =====
-
-    - name: Install PCAP and network forensics tools
-      apt:
-        name:
-          - wireshark
-          - tshark
-          - tcpdump
-          - nmap
-          - dnsutils
-          - whois
-        state: present
-
-    - name: Add swarm user to wireshark group
-      user:
-        name: swarm
-        groups: wireshark
-        append: yes
-
-    # ===== BINARY / STATIC ANALYSIS =====
-
-    - name: Install binary and static analysis tools
-      apt:
-        name:
-          - binutils               # strings, objdump, readelf, nm
-          - file                   # file type identification
-          - xxd                    # hex dump
-          - radare2                # RE framework
-          - binwalk                # binary format detection
-          - upx-ucl                # Mirai binaries are commonly UPX-packed
-          - yara                   # malware pattern matching
-          - libimage-exiftool-perl # binary metadata extraction
-        state: present
-
-    # ===== JAVA (Ghidra dependency) =====
-
-    - name: Install OpenJDK 21
-      apt:
-        name: openjdk-21-jdk
-        state: present
-
-    # ===== PYTHON ANALYSIS ENVIRONMENT =====
-    # Dedicated venv avoids Ubuntu 24.04's externally-managed Python restriction
-    # and keeps analysis tools globally accessible via PATH.
-
-    - name: Create Python venv for analysis tools
-      command: python3 -m venv {{ analysis_venv }}
-      args:
-        creates: "{{ analysis_venv }}/bin/python"
-
-    - name: Upgrade pip inside analysis venv
-      pip:
-        name: pip
-        state: latest
-        virtualenv: "{{ analysis_venv }}"
-
-    - name: Install Python malware analysis packages
-      pip:
-        name:
-          - pefile        # PE file parsing
-          - yara-python   # Python YARA bindings
-          - capstone      # disassembly library
-          - scapy         # PCAP parsing and packet dissection
-        virtualenv: "{{ analysis_venv }}"
-
-    - name: Add analysis venv to swarm PATH
-      blockinfile:
-        path: "{{ swarm_home }}/.bashrc"
-        marker: "# {mark} ANSIBLE MANAGED BLOCK - Analysis venv PATH"
-        block: |
-          export PATH="{{ analysis_venv }}/bin:$PATH"
-          export VIRTUAL_ENV="{{ analysis_venv }}"
-        owner: swarm
-        group: swarm
-
     # ===== BOOT SPLASH (Plymouth) =====
 
     - name: Install Plymouth themes package
@@ -259,6 +181,13 @@
       command: plymouth-set-default-theme -R spinner
       args:
         creates: /etc/alternatives/default.plymouth
+
+    # ===== JAVA (Ghidra dependency) =====
+
+    - name: Install OpenJDK 21
+      apt:
+        name: openjdk-21-jdk
+        state: present
 
     # ===== GHIDRA =====
 
@@ -278,6 +207,223 @@
         name: ghidra
         classic: yes
         state: present
+
+    # ===== REMNUX TOOLS =====
+    # x86: run the official REMnux addon installer — installs the full tool suite
+    #       (~60 min, idempotent via /etc/remnux-version sentinel)
+    # ARM: manually install the ARM-compatible equivalent package set
+
+    # --- x86: REMnux addon installer ---
+
+    - name: Download REMnux installer (x86 only)
+      get_url:
+        url: "https://REMnux.org/remnux"
+        dest: /usr/local/bin/remnux
+        mode: '0755'
+        checksum: "sha256:15581da24c906126aba2c1e21001311d7a93d9d017c95597c662372248964661"
+      when: is_x86_64
+
+    - name: Run REMnux addon installer (x86 only — takes ~60 min)
+      command: remnux install --mode=addon
+      args:
+        creates: /etc/remnux-version
+      when: is_x86_64
+      async: 7200
+      poll: 30
+
+    # --- ARM64: apt packages ---
+
+    - name: Install REMnux-equivalent apt packages (ARM64)
+      apt:
+        name:
+          # Network / PCAP forensics
+          - wireshark
+          - tshark
+          - tcpdump
+          - tcpflow
+          - nmap
+          - dnsutils
+          - whois
+          - ngrep
+          - tor
+          # Binary / static analysis
+          - binutils
+          - file
+          - xxd
+          - radare2
+          - binwalk
+          - upx-ucl
+          - yara
+          - libimage-exiftool-perl
+          - bulk-extractor
+          - scalpel
+          - sleuthkit
+          - ltrace
+          - strace
+          - gdb
+          - ssdeep
+          - nasm
+          # Document / office analysis
+          - qpdf
+          - pdfresurrect
+          - xmlstarlet
+          - zbar-tools
+          - imagemagick
+          - evince
+          # Build dependencies required by RE tools
+          - autoconf
+          - automake
+          - flex
+          - libboost-dev
+          - libboost-python-dev
+          - libboost-system-dev
+          - libffi-dev
+          - libjpeg-dev
+          - libjpeg8-dev
+          - liblzma-dev
+          - libsqlite3-dev
+          - libssl-dev
+          - libtool
+          - libxml2-dev
+          - libxslt1-dev
+          - libgraphviz-dev
+          - libfuzzy-dev
+          - graphviz
+          - zlib1g-dev
+          # Java-based tools
+          - default-jre
+          - libjavassist-java
+          # Archive / encoding utilities
+          - cabextract
+          - dos2unix
+          - p7zip-full
+          - unrar
+          - rar
+          - sharutils
+          - jq
+          # Version control
+          - mercurial
+          - subversion
+          # Scripting runtimes
+          - ruby
+          - ruby-dev
+          - bundler
+          - nodejs
+          # Python system packages
+          - python3-magic
+          - python3-pyasn1
+          - python3-dnspython
+          - python3-numpy
+          - python3-pil
+          - python3-requests
+          - python3-cryptography
+          - python3-ssdeep
+          - python3-tk
+          - python3-pyqt5
+          # Perl analysis libs
+          - libemail-outlook-message-perl
+          # AV / detection
+          - clamav-daemon
+          # Office / document formats
+          - msitools
+          - sqlite3
+          # Misc network
+          - netcat-openbsd
+        state: present
+      when: is_arm64
+
+    - name: Add swarm user to wireshark group (ARM64)
+      user:
+        name: swarm
+        groups: wireshark
+        append: yes
+      when: is_arm64
+
+    # --- ARM64: Python venv and pip packages ---
+
+    - name: Create Python analysis venv (ARM64)
+      command: python3 -m venv {{ analysis_venv }}
+      args:
+        creates: "{{ analysis_venv }}/bin/python"
+      when: is_arm64
+
+    - name: Upgrade pip in analysis venv (ARM64)
+      pip:
+        name: pip
+        state: latest
+        virtualenv: "{{ analysis_venv }}"
+      when: is_arm64
+
+    - name: Install Python malware analysis packages (ARM64)
+      pip:
+        name:
+          # Core RE / PE analysis
+          - pefile
+          - peframe
+          - pyelftools
+          - lief
+          - dnfile
+          - dotnetfile
+          # Disassembly / emulation
+          - capstone
+          - r2pipe
+          # PCAP / network
+          - scapy
+          - mitmproxy
+          - fakenet-ng
+          # Office / document analysis
+          - oletools
+          - olefile
+          - msoffcrypto-tool
+          - pcodedmp
+          - xlmmacrodeobfuscator
+          - peepdf-3
+          - hachoir
+          # Android / mobile
+          - androguard
+          - apkid
+          - droidlysis
+          # Python bytecode
+          - uncompyle6
+          # YARA / pattern matching
+          - yara-python
+          - balbuzard
+          # Memory forensics
+          - volatility3
+          - vivisect
+          # Threat intel / IOC
+          - ioc-parser
+          - ipwhois
+          - unfurl
+          - name-that-hash
+          # Deobfuscation / analysis
+          - jsbeautifier
+          - xortool
+          - chepy
+          - malwoverview
+          - debloat
+          - magika
+          - thefuzz
+          # Misc utilities
+          - python-debian
+          - distro-info
+          - mail-parser
+          - msg-extractor
+          - dissect
+          - pyinstxtractor-ng
+        virtualenv: "{{ analysis_venv }}"
+      when: is_arm64
+
+    - name: Add analysis venv to swarm PATH (ARM64)
+      blockinfile:
+        path: "{{ swarm_home }}/.bashrc"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Analysis venv PATH"
+        block: |
+          export PATH="{{ analysis_venv }}/bin:$PATH"
+          export VIRTUAL_ENV="{{ analysis_venv }}"
+        owner: swarm
+        group: swarm
+      when: is_arm64
 
     # ===== ANALYSIS WORKSPACE =====
 
@@ -318,7 +464,8 @@
         content: |
           Malware Analysis Workspace
           ==========================
-          Architecture: {{ ansible_architecture }}
+          Architecture : {{ ansible_architecture }}
+          Tool Set     : {{ 'REMnux (full addon install)' if is_x86_64 else 'REMnux-equivalent (ARM64 package set)' }}
 
           Directories:
             ~/Mirai-Source-Code   - Mirai botnet source
@@ -335,21 +482,22 @@
             - Do NOT copy malware outside isolated environments
 
           Installed Tools:
-            Reverse Engineering : Ghidra {{ ghidra_version }}, radare2, binwalk
+            Reverse Engineering : Ghidra (snap), radare2, binwalk
             Binary Utilities    : strings, objdump, readelf (binutils), file, xxd, exiftool
             Packed Binaries     : upx  (Mirai is often UPX-packed — run: upx -d <binary>)
             PCAP Forensics      : Wireshark, tshark, tcpdump
             Network / IoC       : nmap, dig (dnsutils), whois
             Pattern Matching    : yara
-            Python (in venv)    : pefile, yara-python, capstone, scapy
+            Python              : pefile, oletools, volatility3, capstone, scapy + more
+            x86 only            : Full REMnux addon suite (wine, shellcode tools, etc.)
 
           Quick Commands:
-            ghidra            - Launch Ghidra
-            r2 <file>         - radare2 binary analysis
-            binwalk <file>    - Identify binary formats / sections
-            strings <file>    - Extract printable strings (-a flag set by default)
-            upx -d <file>     - Decompress UPX-packed binary before loading into Ghidra
-            tshark -r <pcap>  - CLI PCAP inspection
+            ghidra              - Launch Ghidra
+            r2 <file>           - radare2 binary analysis
+            binwalk <file>      - Identify binary formats / sections
+            strings <file>      - Extract printable strings (-a flag set by default)
+            upx -d <file>       - Decompress UPX-packed binary before loading into Ghidra
+            tshark -r <pcap>    - CLI PCAP inspection
             yara <rules> <file> - Scan binary against YARA rules
         owner: swarm
         group: swarm
@@ -429,18 +577,19 @@
           - "======================================================="
           - " Architecture : {{ ansible_architecture }}"
           - " Platform     : {{ 'x86_64 (Intel/AMD)' if is_x86_64 else 'ARM64 (Apple Silicon / UTM)' }}"
+          - " Tool Set     : {{ 'REMnux addon (full)' if is_x86_64 else 'REMnux-equivalent (ARM64)' }}"
           - ""
           - " Installed Tools:"
-          - "   RE / Static : Ghidra {{ ghidra_version }}, radare2, binwalk, upx"
+          - "   RE / Static : Ghidra (snap), radare2, binwalk, upx"
           - "   Bin utils   : strings, objdump, readelf, file, xxd, exiftool"
           - "   PCAP        : Wireshark, tshark, tcpdump"
           - "   Network/IoC : nmap, dig, whois"
           - "   Patterns    : yara"
-          - "   Python venv : pefile, yara-python, capstone, scapy"
+          - "   Python      : pefile, oletools, volatility3, capstone, scapy + more"
+          - "   x86 only    : Full REMnux addon suite"
           - ""
           - " VM Credentials : swarm / 6262student"
           - " Desktop        : KDE Plasma (SDDM login required; screen lock disabled)"
-          - " Analysis venv  : {{ analysis_venv }} (on PATH via .bashrc)"
           - ""
           - " IMPORTANT: Static analysis only — do NOT execute malware binaries."
           - " Restart the VM for desktop changes to take effect."
