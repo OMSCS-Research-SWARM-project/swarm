@@ -63,7 +63,7 @@
     - name: Ensure swarm user is in required groups
       user:
         name: swarm
-        groups: sudo,audio,video,plugdev,netdev,adm,wireshark
+        groups: sudo,audio,video,plugdev,netdev,adm,vboxsf
         append: yes
 
     - name: Allow Wireshark capture without sudo
@@ -87,6 +87,7 @@
         name:
           - kde-plasma-desktop
           - sddm
+          - sddm-theme-breeze
           - konsole
           - dolphin
           - kate
@@ -114,13 +115,23 @@
         state: directory
         mode: '0755'
 
-    - name: Configure SDDM autologin for swarm
+    - name: Remove any existing SDDM autologin config
+      file:
+        path: /etc/sddm.conf.d/autologin.conf
+        state: absent
+
+    - name: Configure SDDM login (password required, breeze dark theme)
       copy:
-        dest: /etc/sddm.conf.d/autologin.conf
+        dest: /etc/sddm.conf.d/kde.conf
         content: |
-          [Autologin]
-          User=swarm
-          Session=plasma
+          [General]
+          DefaultSession=plasma
+
+          [Theme]
+          Current=breeze
+
+          [Users]
+          DefaultUser=swarm
         mode: '0644'
       notify: Restart SDDM
 
@@ -162,39 +173,6 @@
       when: is_arm64
       ignore_errors: yes
 
-    - name: Check if VirtualBox guest packages are available
-      shell: apt-cache search virtualbox-guest | grep -q virtualbox-guest-utils
-      register: vbox_packages_available
-      ignore_errors: yes
-      changed_when: false
-
-    - name: Install VirtualBox guest additions from repos (x86_64 only)
-      apt:
-        name:
-          - virtualbox-guest-utils
-          - virtualbox-guest-x11
-        state: present
-      when:
-        - is_x86_64
-        - vbox_packages_available.rc == 0
-      ignore_errors: yes
-
-    - name: Create VirtualBox manual-install note if packages not available
-      copy:
-        dest: "{{ swarm_home }}/Desktop/INSTALL_VBOX_GUEST_ADDITIONS.txt"
-        content: |
-          VirtualBox Guest Additions Installation
-          ========================================
-          If running in VirtualBox: Devices > Insert Guest Additions CD image, then:
-            cd /media/swarm/VBox_GAs_*
-            sudo ./VBoxLinuxAdditions.run
-          Reboot after installation.
-        owner: swarm
-        group: swarm
-        mode: '0644'
-      when: vbox_packages_available.rc != 0
-      ignore_errors: yes
-
     # ===== PCAP / NETWORK FORENSICS =====
 
     - name: Install PCAP and network forensics tools
@@ -207,6 +185,12 @@
           - dnsutils
           - whois
         state: present
+
+    - name: Add swarm user to wireshark group
+      user:
+        name: swarm
+        groups: wireshark
+        append: yes
 
     # ===== BINARY / STATIC ANALYSIS =====
 
@@ -264,85 +248,36 @@
         owner: swarm
         group: swarm
 
+    # ===== BOOT SPLASH (Plymouth) =====
+
+    - name: Install Plymouth themes package
+      apt:
+        name: plymouth-themes
+        state: present
+
+    - name: Set dark Plymouth spinner theme
+      command: plymouth-set-default-theme -R spinner
+      args:
+        creates: /etc/alternatives/default.plymouth
+
     # ===== GHIDRA =====
 
-    - name: Create Ghidra download directory
-      file:
-        path: /tmp/ghidra_download
-        state: directory
-        mode: '0755'
+    - name: Install snapd
+      apt:
+        name: snapd
+        state: present
 
-    - name: Download Ghidra {{ ghidra_version }}
-      get_url:
-        url: "{{ ghidra_download_url }}"
-        dest: "/tmp/ghidra_download/ghidra.zip"
-        timeout: 300
-      register: ghidra_download
-      retries: 3
-      delay: 10
-      until: ghidra_download is succeeded
+    - name: Ensure snapd service is running
+      systemd:
+        name: snapd
+        enabled: yes
+        state: started
 
-    - name: Extract Ghidra to /opt
-      unarchive:
-        src: "/tmp/ghidra_download/ghidra.zip"
-        dest: /opt
-        remote_src: yes
-        creates: "/opt/ghidra_{{ ghidra_version }}_PUBLIC"
-
-    - name: Create /opt/ghidra symlink
-      file:
-        src: "/opt/ghidra_{{ ghidra_version }}_PUBLIC"
-        dest: /opt/ghidra
-        state: link
-
-    - name: Clean up Ghidra download directory
-      file:
-        path: /tmp/ghidra_download
-        state: absent
-
-    # ===== DESKTOP ENTRIES =====
-
-    - name: Ensure Desktop directory exists
-      file:
-        path: "{{ swarm_home }}/Desktop"
-        state: directory
-        owner: swarm
-        group: swarm
-        mode: '0755'
-
-    - name: Create Ghidra desktop entry
-      copy:
-        dest: "{{ swarm_home }}/Desktop/ghidra.desktop"
-        content: |
-          [Desktop Entry]
-          Version=1.0
-          Type=Application
-          Name=Ghidra
-          Comment=Software Reverse Engineering Tool
-          Exec=/opt/ghidra/ghidraRun
-          Icon=/opt/ghidra/support/ghidra.png
-          Terminal=true
-          Categories=Development;ReverseEngineering;
-        mode: '0755'
-        owner: swarm
-        group: swarm
-
-    - name: Create Wireshark desktop entry
-      copy:
-        dest: "{{ swarm_home }}/Desktop/wireshark.desktop"
-        content: |
-          [Desktop Entry]
-          Version=1.0
-          Type=Application
-          Name=Wireshark
-          Comment=Network Protocol Analyzer
-          Exec=wireshark
-          Icon=wireshark
-          Terminal=false
-          Categories=Network;Security;
-        mode: '0755'
-        owner: swarm
-        group: swarm
+    - name: Install Ghidra via snap
+      snap:
+        name: ghidra
+        classic: yes
+        state: present
 
     # ===== ANALYSIS WORKSPACE =====
 
@@ -392,7 +327,7 @@
             ~/pcaps                - PCAP captures for analysis
 
           Credentials:
-            Username: swarm  |  Password: swarm
+            Username: swarm  |  Password: 6262student
 
           WARNING: This VM contains malware samples for STATIC ANALYSIS ONLY.
             - Do NOT execute any malware binaries
@@ -442,7 +377,6 @@
         path: "{{ swarm_home }}/.bashrc"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Analysis aliases"
         block: |
-          alias ghidra='/opt/ghidra/ghidraRun'
           alias ll='ls -lah'
           alias mirai='cd ~/Mirai-Source-Code'
           alias workspace='cd ~/malware-analysis'
@@ -466,6 +400,25 @@
         path: "{{ swarm_home }}/.Xauthority"
         state: absent
 
+    - name: Ensure KDE config directory exists
+      file:
+        path: "{{ swarm_home }}/.config"
+        state: directory
+        owner: swarm
+        group: swarm
+        mode: '0755'
+
+    - name: Disable KDE screen lock password (wake returns directly to desktop)
+      copy:
+        dest: "{{ swarm_home }}/.config/kscreenlockerrc"
+        content: |
+          [Daemon]
+          Autolock=false
+          LockOnResume=false
+        owner: swarm
+        group: swarm
+        mode: '0644'
+
     # ===== SUMMARY =====
 
     - name: Display completion summary
@@ -485,8 +438,8 @@
           - "   Patterns    : yara"
           - "   Python venv : pefile, yara-python, capstone, scapy"
           - ""
-          - " VM Credentials : swarm / swarm"
-          - " Desktop        : KDE Plasma (SDDM autologin)"
+          - " VM Credentials : swarm / 6262student"
+          - " Desktop        : KDE Plasma (SDDM login required; screen lock disabled)"
           - " Analysis venv  : {{ analysis_venv }} (on PATH via .bashrc)"
           - ""
           - " IMPORTANT: Static analysis only — do NOT execute malware binaries."
