@@ -298,7 +298,7 @@
           Malware Analysis Workspace
           ==========================
           Architecture : {{ ansible_architecture }}
-          Tool Set     : REMnux-equivalent (apt + pip)
+          Tool Set     : REMnux-like (apt + pip)
 
           Directories:
             ~/Mirai-Source-Code   - Mirai botnet source
