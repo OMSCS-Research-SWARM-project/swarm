@@ -444,6 +444,18 @@
         group: swarm
         mode: '0644'
 
+    - name: Disable KDE Wallet (kwallet) prompts
+      tags: kde
+      copy:
+        dest: "{{ swarm_home }}/.config/kwalletrc"
+        content: |
+          [Wallet]
+          Enabled=false
+          First Use=false
+        owner: swarm
+        group: swarm
+        mode: '0644'
+
     - name: Configure KDE window placement (center new windows, no off-screen restore)
       tags: kde
       copy:
