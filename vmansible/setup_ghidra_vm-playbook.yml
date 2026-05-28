@@ -306,6 +306,42 @@
         version: main
       become_user: swarm
 
+    - name: Install uv package manager
+      shell: curl -LsSf https://astral.sh/uv/install.sh | sh
+      args:
+        creates: "{{ swarm_home }}/.local/bin/uv"
+      become_user: swarm
+
+    - name: Run uv sync in swarm-files
+      shell: "{{ swarm_home }}/.local/bin/uv sync"
+      args:
+        chdir: "{{ swarm_home }}/swarm-files"
+      become_user: swarm
+
+    - name: Create malware-sample directory
+      file:
+        path: "{{ swarm_home }}/malware-sample"
+        state: directory
+        owner: swarm
+        group: swarm
+        mode: '0755'
+
+    - name: Copy malware sample zip to VM
+      copy:
+        src: "/home/vttrain/malware-sample/sample.zip"
+        dest: "{{ swarm_home }}/malware-sample/sample.zip"
+        owner: swarm
+        group: swarm
+        mode: '0644'
+
+    - name: Unzip malware sample on VM
+      unarchive:
+        src: "{{ swarm_home }}/malware-sample/sample.zip"
+        dest: "{{ swarm_home }}/malware-sample"
+        remote_src: yes
+        owner: swarm
+        group: swarm
+
     - name: Symlink Linux.Mirai.B into home directory
       file:
         src: "{{ swarm_home }}/theZoo/malware/Binaries/Linux.Mirai.B"
