@@ -91,12 +91,8 @@ The two-part structure ensures you can't shortcut the learning by feeding raw ma
 ### Time Commitment
 
 **Total Estimated Time**: 20-30 hours over 3 weeks
-<<<<<<< HEAD
 - Part 1 (Manual Malware Analysis): 9-14 hours
 - Part 1.5 (Binary Analysis with Ghidra): 30-60 minutes
-=======
-- Part 1 (Manual Analysis): 10-15 hours
->>>>>>> e6f21bd (Update project timeline from 6 weeks to 3 weeks)
 - Part 2 (AI Agent Development): 10-15 hours
 
 This is a graduate-level project with an expected workload of up to 10 hours per week. The 3-week timeline allows you to develop deep expertise in both manual analysis and AI-augmented workflows.
@@ -261,11 +257,7 @@ While training data is Mirai-specific, the agent system is designed to generaliz
 
 ### Project Timeline
 
-<<<<<<< HEAD
 **Week 1**: Manual and binary analysis (Parts 1 & 1.5)
-=======
-**Week 1**: Manual analysis (Part 1)
->>>>>>> e6f21bd (Update project timeline from 6 weeks to 3 weeks)
 - Source code analysis
 - Binary analysis with Ghidra (~30-60 min)
 - PCAP forensics

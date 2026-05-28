@@ -291,6 +291,30 @@
         version: master
       become_user: swarm
 
+    - name: Clone theZoo Linux.Mirai.B binary samples
+      git:
+        repo: 'https://github.com/ytisf/theZoo.git'
+        dest: "{{ swarm_home }}/theZoo"
+        version: master
+        depth: 1
+      become_user: swarm
+
+    - name: Clone SWARM project files repository
+      git:
+        repo: 'https://github.com/OMSCS-Research-SWARM-project/swarm-files.git'
+        dest: "{{ swarm_home }}/swarm-files"
+        version: main
+      become_user: swarm
+
+    - name: Symlink Linux.Mirai.B into home directory
+      file:
+        src: "{{ swarm_home }}/theZoo/malware/Binaries/Linux.Mirai.B"
+        dest: "{{ swarm_home }}/Linux.Mirai.B"
+        state: link
+        owner: swarm
+        group: swarm
+      become_user: swarm
+
     - name: Write workspace README
       copy:
         dest: "{{ swarm_home }}/malware-analysis/README.txt"
@@ -301,7 +325,10 @@
           Tool Set     : REMnux-like (apt + pip)
 
           Directories:
-            ~/Mirai-Source-Code   - Mirai botnet source
+            ~/Mirai-Source-Code   - Mirai botnet source code
+            ~/Linux.Mirai.B        - Mirai packed binaries (theZoo samples, symlink)
+            ~/theZoo               - Full theZoo malware repo (shallow clone)
+            ~/swarm-files          - SWARM project shared files and resources
             ~/GhidraProjects       - Ghidra project files
             ~/malware-analysis     - Analysis notes and reports
             ~/pcaps                - PCAP captures for analysis
@@ -358,6 +385,7 @@
         block: |
           alias ll='ls -lah'
           alias mirai='cd ~/Mirai-Source-Code'
+          alias miraibin='cd ~/Linux.Mirai.B'
           alias workspace='cd ~/malware-analysis'
           alias pcap='cd ~/pcaps'
           alias r2='radare2'
