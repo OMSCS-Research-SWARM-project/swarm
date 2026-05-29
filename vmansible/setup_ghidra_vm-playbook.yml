@@ -397,6 +397,15 @@
         group: swarm
         mode: '0644'
 
+    # ===== BROWSER CONFIGURATION =====
+
+    - name: Configure Chromium to use basic password store (suppress KWallet popup)
+      copy:
+        dest: /etc/chromium-browser/customizations/01-password-store
+        content: |
+          CHROMIUM_FLAGS="${CHROMIUM_FLAGS} --password-store=basic"
+        mode: '0644'
+
     # ===== SHELL CONFIGURATION =====
 
     - name: Configure vim
@@ -438,6 +447,11 @@
         group: swarm
         recurse: yes
 
+    - name: Remove executable bit from student-supplied files (skip hidden dirs)
+      shell: |
+        find {{ swarm_home }} -name '.*' -prune -o -type f -perm /111 -exec chmod a-x {} +
+      changed_when: false
+
     - name: Remove stale .Xauthority file
       file:
         path: "{{ swarm_home }}/.Xauthority"
@@ -452,7 +466,18 @@
         group: swarm
         mode: '0755'
 
-    - name: Disable KDE screen lock
+    - name: Disable KDE screen lock (system-level immutable, prevents session override)
+      tags: kde
+      copy:
+        dest: /etc/xdg/kscreenlockerrc
+        content: |
+          [Daemon][$i]
+          Autolock=false
+          LockOnResume=false
+          Timeout=0
+        mode: '0644'
+
+    - name: Disable KDE screen lock (user-level fallback)
       tags: kde
       copy:
         dest: "{{ swarm_home }}/.config/kscreenlockerrc"
@@ -460,21 +485,6 @@
           [Daemon]
           Autolock=false
           LockOnResume=false
-          Timeout=0
-          [Greeter]
-          Theme=org.kde.breeze.desktop
-        owner: swarm
-        group: swarm
-        mode: '0644'
-
-    - name: Disable KDE screensaver
-      copy:
-        dest: "{{ swarm_home }}/.config/kscreensaverrc"
-        content: |
-          [ScreenSaver]
-          Enabled=false
-          Lock=false
-          LockGrace=0
           Timeout=0
         owner: swarm
         group: swarm
