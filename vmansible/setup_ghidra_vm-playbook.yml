@@ -168,7 +168,6 @@
       systemd:
         name: qemu-guest-agent
         enabled: yes
-        state: started
       ignore_errors: yes
 
     # ===== NETWORKING =====
@@ -312,6 +311,7 @@
         repo: 'https://github.com/jgamblin/Mirai-Source-Code.git'
         dest: "{{ swarm_home }}/Mirai-Source-Code"
         version: master
+        force: yes
       become_user: swarm
 
     - name: Clone SWARM project files repository
@@ -349,6 +349,11 @@
         git -C "$tmpdir" sparse-checkout set malware/Binaries/Linux.Mirai.B
         mv "$tmpdir/malware/Binaries/Linux.Mirai.B" "{{ swarm_home }}/malware-sample/Linux.Mirai.B"
         rm -rf "$tmpdir"
+        dir="{{ swarm_home }}/malware-sample/Linux.Mirai.B"
+        rm -f "$dir"/*.md5 "$dir"/*.sha1 "$dir"/*.shasum "$dir"/*.pass
+        find "$dir" -maxdepth 1 -name "*.zip" | while read z; do
+          unzip -P infected -o "$z" -d "$dir" && rm -f "$z"
+        done
       args:
         creates: "{{ swarm_home }}/malware-sample/Linux.Mirai.B"
       become_user: swarm
@@ -411,6 +416,12 @@
         mode: '0644'
 
     # ===== BROWSER CONFIGURATION =====
+
+    - name: Ensure Chromium customizations directory exists
+      file:
+        path: /etc/chromium-browser/customizations
+        state: directory
+        mode: '0755'
 
     - name: Configure Chromium to use basic password store (suppress KWallet popup)
       copy:
